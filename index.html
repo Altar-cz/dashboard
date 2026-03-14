@@ -3,434 +3,519 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chill Drive Multiplayer</title>
+    <title>Chill Drive: Ultimate Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
-            --sky-color: #87CEEB;
-            --grass-color: #2dcc70;
-            --road-color: #34495e;
-            --p1-color: #e74c3c;
-            --p2-color: #3498db;
+            --p1-color: #ff4757;
+            --p2-color: #1e90ff;
+            --road-grey: #2d3436;
+            --grass-green: #2ecc71;
+            --sky-blue: #81ecec;
         }
 
         body { 
             margin: 0; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
             overflow: hidden; 
-            background: #333; 
-            color: white;
+            background: #000; 
+            color: #fff;
+            user-select: none;
         }
 
-        /* --- SETUP SCREEN --- */
+        /* --- MENU & SETUP --- */
         #setup {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            z-index: 100;
-            position: relative;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            padding: 3rem;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
         }
 
         .btn {
             background: #fff;
-            color: #1e3c72;
+            color: #1a1a1a;
             border: none;
-            padding: 15px 30px;
-            border-radius: 30px;
-            font-weight: bold;
+            padding: 1.2rem 2.5rem;
+            border-radius: 50px;
+            font-weight: 900;
             cursor: pointer;
-            font-size: 1.2rem;
+            font-size: 1rem;
             margin: 10px;
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
 
-        .btn:hover { transform: scale(1.05); }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255,255,255,0.4); }
+        .btn-green { background: #2ecc71; color: white; }
 
         input {
-            padding: 15px;
-            border-radius: 30px;
-            border: none;
+            padding: 1.2rem;
+            border-radius: 50px;
+            border: 2px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 1.5rem;
             text-align: center;
-            font-size: 1.2rem;
-            margin: 10px;
+            width: 200px;
+            margin-bottom: 20px;
+            outline: none;
         }
 
-        /* --- GAME SCREEN (MONITOR) --- */
+        /* --- MONITOR UI --- */
         #game-screen {
             display: none;
             width: 100vw;
             height: 100vh;
-            background: var(--sky-color);
+            background: var(--sky-blue);
+            overflow: hidden;
             position: relative;
         }
 
-        .grass {
+        .parallax-layer {
             position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 60vh;
-            background: var(--grass-color);
+            width: 200%;
+            height: 100%;
+            left: -50%;
+            pointer-events: none;
         }
+
+        .clouds { background: url('https://www.transparenttextures.com/patterns/clouds.png'); opacity: 0.3; top: 0; height: 50%; animation: moveBg 60s linear infinite; }
+        .mountains { bottom: 35%; height: 300px; background: linear-gradient(transparent, #2d3436); clip-path: polygon(0% 100%, 15% 20%, 30% 60%, 45% 10%, 60% 70%, 75% 30%, 90% 80%, 100% 100%); opacity: 0.4; }
+
+        .ground { position: absolute; bottom: 0; width: 100%; height: 40vh; background: var(--grass-green); }
 
         .road {
             position: absolute;
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            width: 450px;
-            height: 60vh;
-            background: var(--road-color);
-            clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
+            width: 600px;
+            height: 40vh;
+            background: var(--road-grey);
+            clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+            border-left: 10px solid #fff;
+            border-right: 10px solid #fff;
             overflow: hidden;
         }
 
-        .marking {
+        .road-stripes {
             position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 10px;
-            height: 100%;
-            background: repeating-linear-gradient(transparent, transparent 20px, white 20px, white 40px);
+            top: 0; left: 50%; transform: translateX(-50%);
+            width: 15px; height: 100%;
+            background: repeating-linear-gradient(transparent, transparent 40px, #fff 40px, #fff 80px);
         }
 
-        .animating .marking {
-            animation: move-road var(--speed, 1s) linear infinite;
-        }
+        .animating .road-stripes { animation: scrollRoad var(--road-speed, 1s) linear infinite; }
 
-        @keyframes move-road {
-            from { background-position: 0 0; }
-            to { background-position: 0 40px; }
-        }
+        @keyframes scrollRoad { from { background-position: 0 0; } to { background-position: 0 80px; } }
+        @keyframes moveBg { from { transform: translateX(0); } to { transform: translateX(20%); } }
 
+        /* --- CARS & OBJECTS --- */
         .car {
             width: 70px;
-            height: 100px;
+            height: 110px;
             position: absolute;
-            bottom: 50px;
-            z-index: 10;
+            bottom: 40px;
+            z-index: 100;
             transition: left 0.1s ease-out, transform 0.1s ease-out, opacity 0.3s;
+            filter: drop-shadow(0 15px 10px rgba(0,0,0,0.4));
         }
 
-        .car-body-p1 { fill: var(--p1-color); stroke: #c0392b; stroke-width: 2; }
-        .car-body-p2 { fill: var(--p2-color); stroke: #2980b9; stroke-width: 2; }
-        .window { fill: #ecf0f1; }
+        .car-label { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 5px; font-size: 10px; white-space: nowrap; }
 
-        .obstacle {
+        .item {
             position: absolute;
-            width: 40px;
-            height: 40px;
-            background: #f39c12;
-            border-radius: 5px;
-            z-index: 5;
-            box-shadow: 0 4px #d35400;
+            width: 40px; height: 40px;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
         }
 
-        /* --- CONTROLLER SCREEN (MOBILE) --- */
+        .fuel-bar-container { width: 60px; height: 4px; background: #000; position: absolute; bottom: -10px; left: 5px; border-radius: 2px; }
+        .fuel-bar { height: 100%; background: #2ecc71; width: 100%; transition: width 0.3s; }
+
+        /* --- HUD --- */
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 500;
+            pointer-events: none;
+        }
+
+        .stat { background: rgba(0,0,0,0.6); padding: 15px 25px; border-radius: 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .stat-val { font-size: 1.5rem; font-weight: 900; color: #f1c40f; }
+
+        /* --- MOBILE CONTROLLER --- */
         #controller-screen {
             display: none;
             width: 100vw;
             height: 100vh;
-            background: #222;
+            background: #121212;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            touch-action: none;
+            justify-content: space-around;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
-        .wheel-container {
-            width: 160px;
-            height: 160px;
-            border: 12px solid #555;
-            border-radius: 50%;
-            position: relative;
-            transition: transform 0.1s ease-out;
-            margin-bottom: 20px;
-        }
-
-        .wheel-spoke { position: absolute; top: 50%; left: 50%; width: 100%; height: 15px; background: #555; transform: translate(-50%, -50%); }
-        .wheel-spoke-v { position: absolute; top: 0%; left: 50%; width: 15px; height: 50%; background: #555; transform: translateX(-50%); }
-
-        .pedals {
-            display: flex;
-            gap: 20px;
+        .ctrl-grid {
+            display: grid;
+            grid-template-columns: 100px 1fr 100px;
             width: 100%;
-            justify-content: center;
+            height: 100%;
+            gap: 20px;
+            align-items: center;
         }
 
         .pedal {
-            width: 70px;
-            height: 100px;
-            background: #444;
-            border-radius: 10px;
+            height: 150px;
+            background: #222;
+            border: 4px solid #333;
+            border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 0.8rem;
-            user-select: none;
+            font-weight: 900;
+            transition: 0.1s;
         }
 
-        .pedal:active { background: #666; transform: scale(0.95); }
-        .pedal-gas { border-bottom: 5px solid #2ecc71; }
-        .pedal-brake { border-bottom: 5px solid #e74c3c; }
+        .pedal:active { transform: scale(0.9); background: #333; }
+        .gas { border-color: #2ecc71; color: #2ecc71; }
+        .brake { border-color: #e74c3c; color: #e74c3c; }
 
-        #player-id-tag {
-            padding: 10px 20px;
-            border-radius: 20px;
-            margin-bottom: 20px;
-            font-weight: bold;
+        .dashboard { text-align: center; }
+        .steering-wheel {
+            width: 180px;
+            height: 180px;
+            border: 15px solid #444;
+            border-radius: 50%;
+            position: relative;
+            margin: 0 auto;
+            transition: transform 0.1s ease-out;
         }
+        .steering-wheel::after { content: ''; position: absolute; top: 0; left: 50%; width: 10px; height: 30px; background: #e74c3c; transform: translateX(-50%); border-radius: 5px; }
 
-        .winner-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+        #win-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 200;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <!-- SETUP SCREEN -->
+    <!-- SETUP -->
     <div id="setup">
-        <h1 style="font-size: 3rem; margin-bottom: 10px;">🌲 CHILL DRIVE</h1>
-        <p style="margin-bottom: 30px; color: #aaa;">MULTIPLAYER EDITION</p>
-        <button class="btn" onclick="startAsMonitor()">SPUSTIT JAKO MONITOR</button>
-        <div style="margin: 20px; color: #ccc;">— nebo —</div>
-        <input type="text" id="roomInput" placeholder="KÓD MÍSTNOSTI">
-        <button class="btn" style="background: #2ecc71; color: white;" onclick="requestPermission()">PŘIPOJIT MOBIL</button>
+        <div class="card">
+            <h1 style="font-size: 4rem; margin: 0;">CHILL <span style="color: #f1c40f;">DRIVE</span></h1>
+            <p style="opacity: 0.5; letter-spacing: 5px; margin-bottom: 2rem;">ULTIMATE EDITION</p>
+            
+            <button class="btn" onclick="startMonitor()">HOSTOVAT MONITOR (PC)</button>
+            <div style="margin: 20px; opacity: 0.3;">——— nebo ———</div>
+            <input type="text" id="roomInput" placeholder="KÓD" maxlength="4">
+            <br>
+            <button class="btn btn-green" onclick="startController()">PŘIPOJIT MOBIL</button>
+        </div>
     </div>
 
-    <!-- MONITOR SCREEN -->
+    <!-- MONITOR -->
     <div id="game-screen">
-        <div class="room-badge">MÍSTNOST: <b id="displayCode"></b></div>
-        
-        <div id="wait-msg" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); padding:20px; border-radius:15px; text-align:center; z-index:50;">
-            <h3 id="status-text">ČEKÁM NA HRÁČE (0/2)...</h3>
-            <p>Připojte se dvěma mobily pomocí stejného kódu.</p>
+        <div id="hud">
+            <div class="stat">
+                <small>VZDÁLENOST</small><br>
+                <span class="stat-val" id="dist-ui">0 m</span>
+            </div>
+            <div class="stat" style="text-align: center;">
+                <small id="lobby-status">ČEKÁNÍ NA HRÁČE...</small><br>
+                <span class="stat-val" id="room-ui" style="color: #fff;">----</span>
+            </div>
+            <div class="stat" style="text-align: right;">
+                <small>RYCHLOST</small><br>
+                <span class="stat-val" id="speed-ui">0 km/h</span>
+            </div>
         </div>
 
-        <div id="winner-screen" class="winner-overlay">
-            <h1 id="winner-text">HRÁČ 1 VYHRÁL!</h1>
+        <div class="parallax-layer clouds"></div>
+        <div class="parallax-layer mountains"></div>
+        <div class="ground"></div>
+
+        <div class="road" id="game-road">
+            <div class="road-stripes"></div>
+        </div>
+
+        <!-- Player 1 -->
+        <div id="car-1" class="car" style="display: none; left: 35%;">
+            <div class="car-label">HRÁČ 1</div>
+            <div class="fuel-bar-container"><div id="fuel-1" class="fuel-bar"></div></div>
+            <svg viewBox="0 0 100 150">
+                <path d="M20,130 L80,130 L85,110 L85,40 L70,20 L30,20 L15,40 L15,110 Z" fill="var(--p1-color)" />
+                <rect x="25" y="45" width="50" height="25" rx="5" fill="rgba(255,255,255,0.4)" />
+                <rect x="20" y="25" width="10" height="5" fill="#f1c40f" />
+                <rect x="70" y="25" width="10" height="5" fill="#f1c40f" />
+            </svg>
+        </div>
+
+        <!-- Player 2 -->
+        <div id="car-2" class="car" style="display: none; left: 65%;">
+            <div class="car-label">HRÁČ 2</div>
+            <div class="fuel-bar-container"><div id="fuel-2" class="fuel-bar"></div></div>
+            <svg viewBox="0 0 100 150">
+                <path d="M20,130 L80,130 L85,110 L85,40 L70,20 L30,20 L15,40 L15,110 Z" fill="var(--p2-color)" />
+                <rect x="25" y="45" width="50" height="25" rx="5" fill="rgba(255,255,255,0.4)" />
+                <rect x="20" y="25" width="10" height="5" fill="#f1c40f" />
+                <rect x="70" y="25" width="10" height="5" fill="#f1c40f" />
+            </svg>
+        </div>
+
+        <div id="win-overlay">
+            <h1 id="win-msg" style="font-size: 5rem; margin: 0;">VÍTĚZ!</h1>
+            <p id="win-score" style="font-size: 1.5rem; opacity: 0.7;">Vzdálenost: 0 m</p>
             <button class="btn" onclick="location.reload()">HRÁT ZNOVU</button>
         </div>
-
-        <div class="grass"></div>
-        <div class="road" id="road-element">
-            <div class="marking"></div>
-        </div>
-        
-        <!-- Player 1 Car -->
-        <div id="car-1" class="car" style="left: 35%; display: none;">
-            <svg viewBox="0 0 100 150">
-                <rect x="10" y="20" width="80" height="110" rx="15" class="car-body-p1" />
-                <rect x="20" y="40" width="60" height="30" rx="5" class="window" />
-            </svg>
-        </div>
-
-        <!-- Player 2 Car -->
-        <div id="car-2" class="car" style="left: 65%; display: none;">
-            <svg viewBox="0 0 100 150">
-                <rect x="10" y="20" width="80" height="110" rx="15" class="car-body-p2" />
-                <rect x="20" y="40" width="60" height="30" rx="5" class="window" />
-            </svg>
-        </div>
     </div>
 
-    <!-- CONTROLLER SCREEN -->
+    <!-- CONTROLLER -->
     <div id="controller-screen">
-        <div id="player-id-tag">VYHLEDÁVÁM POZICI...</div>
-        <h3 id="orient-warn">OTOČTE TELEFON</h3>
-        <div id="wheel" class="wheel-container">
-            <div class="wheel-spoke"></div>
-            <div class="wheel-spoke-v"></div>
+        <div class="dashboard">
+            <div id="p-tag" style="padding: 10px 30px; border-radius: 50px; display: inline-block; font-weight: bold; margin-bottom: 20px;">HLEDÁM POZICI...</div>
+            <h2 id="gyro-msg">DRŽTE TELEFON LANDSCAPE</h2>
         </div>
-        <div class="pedals">
-            <div class="pedal pedal-brake" ontouchstart="sendPedal('brake', true)" ontouchend="sendPedal('brake', false)">BRZDA</div>
-            <div class="pedal pedal-gas" ontouchstart="sendPedal('gas', true)" ontouchend="sendPedal('gas', false)">PLYN</div>
+
+        <div class="ctrl-grid">
+            <div class="pedal brake" ontouchstart="sendInput('brake', true)" ontouchend="sendInput('brake', false)">BRZDA</div>
+            
+            <div class="steering-wheel" id="wheel-gfx"></div>
+
+            <div class="pedal gas" ontouchstart="sendInput('gas', true)" ontouchend="sendInput('gas', false)">PLYN</div>
         </div>
+        
+        <div style="font-size: 10px; opacity: 0.3;">CONNECTED TO: <span id="room-connected">----</span></div>
     </div>
 
     <script>
         const socket = io();
-        let currentRoom = "";
-        let isMonitor = false;
-        let gameActive = false;
-        let speedMultiplier = 1;
-        let playersConnected = 0;
-        let myPlayerIndex = null;
-        
-        // Game State for Monitor
-        let p1Data = { pos: 35, angle: 0, alive: true, speed: 1 };
-        let p2Data = { pos: 65, angle: 0, alive: true, speed: 1 };
+        let state = {
+            room: "",
+            isMonitor: false,
+            playerIdx: null,
+            active: false,
+            distance: 0,
+            speed: 5,
+            players: [
+                { pos: 35, angle: 0, fuel: 100, gas: false, brake: false, alive: true },
+                { pos: 65, angle: 0, fuel: 100, gas: false, brake: false, alive: true }
+            ]
+        };
 
-        function startAsMonitor() {
-            isMonitor = true;
-            currentRoom = Math.random().toString(36).substring(2, 6).toUpperCase();
+        // --- SETUP LOGIC ---
+        function startMonitor() {
+            state.isMonitor = true;
+            state.room = Math.random().toString(36).substring(2, 6).toUpperCase();
             document.getElementById('setup').style.display = 'none';
             document.getElementById('game-screen').style.display = 'block';
-            document.getElementById('displayCode').innerText = currentRoom;
-            socket.emit('join-room', currentRoom);
+            document.getElementById('room-ui').innerText = state.room;
+            socket.emit('join-room', state.room);
         }
 
-        function requestPermission() {
+        async function startController() {
+            state.room = document.getElementById('roomInput').value.toUpperCase();
+            if(!state.room) return;
+
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(state => { if (state === 'granted') startAsController(); })
-                    .catch(console.error);
-            } else {
-                startAsController();
+                await DeviceOrientationEvent.requestPermission();
             }
-        }
 
-        function startAsController() {
-            currentRoom = document.getElementById('roomInput').value.toUpperCase();
-            if(!currentRoom) return alert("Zadej kód!");
             document.getElementById('setup').style.display = 'none';
             document.getElementById('controller-screen').style.display = 'flex';
-            socket.emit('join-room', currentRoom);
-            socket.emit('drive-data', { room: currentRoom, status: 'request-index' });
-            window.addEventListener('deviceorientation', handleMotion);
+            document.getElementById('room-connected').innerText = state.room;
+            
+            socket.emit('join-room', state.room);
+            socket.emit('drive-data', { room: state.room, type: 'join-request' });
+
+            window.addEventListener('deviceorientation', handleGyro);
         }
 
-        function sendPedal(type, active) {
-            socket.emit('drive-data', { room: currentRoom, playerIndex: myPlayerIndex, pedal: type, active: active });
-        }
-
-        function handleMotion(event) {
-            if (window.innerWidth > window.innerHeight) {
-                let steering = event.beta; 
-                document.getElementById('wheel').style.transform = `rotate(${steering}deg)`;
-                document.getElementById('orient-warn').style.display = "none";
-                socket.emit('drive-data', { room: currentRoom, playerIndex: myPlayerIndex, angle: steering });
+        function handleGyro(e) {
+            if(window.innerWidth > window.innerHeight) {
+                document.getElementById('gyro-msg').style.display = 'none';
+                const angle = e.beta; // Steering angle
+                document.getElementById('wheel-gfx').style.transform = `rotate(${angle}deg)`;
+                socket.emit('drive-data', { room: state.room, idx: state.playerIdx, angle });
             } else {
-                document.getElementById('orient-warn').style.display = "block";
+                document.getElementById('gyro-msg').style.display = 'block';
             }
         }
 
-        // --- Monitor Logic ---
-        socket.on('update-game', (data) => {
-            if (!isMonitor) {
-                // Controller receiving its assigned index
-                if (data.assignIndex !== undefined && myPlayerIndex === null) {
-                    myPlayerIndex = data.assignIndex;
-                    const tag = document.getElementById('player-id-tag');
-                    tag.innerText = `HRÁČ ${myPlayerIndex + 1}`;
-                    tag.style.background = myPlayerIndex === 0 ? 'var(--p1-color)' : 'var(--p2-color)';
+        function sendInput(type, active) {
+            socket.emit('drive-data', { room: state.room, idx: state.playerIdx, pedal: type, active });
+        }
+
+        // --- NETWORK & SYNC ---
+        socket.on('update-game', data => {
+            if (!state.isMonitor) {
+                if (data.type === 'assign' && state.playerIdx === null) {
+                    state.playerIdx = data.idx;
+                    const tag = document.getElementById('p-tag');
+                    tag.innerText = `HRÁČ ${data.idx + 1}`;
+                    tag.style.background = data.idx === 0 ? 'var(--p1-color)' : 'var(--p2-color)';
                 }
                 return;
             }
 
             // Monitor Logic
-            if (data.status === 'request-index') {
-                socket.emit('drive-data', { room: currentRoom, assignIndex: playersConnected });
-                playersConnected++;
-                document.getElementById('status-text').innerText = `ČEKÁM NA HRÁČE (${playersConnected}/2)...`;
-                
-                if (playersConnected === 1) document.getElementById('car-1').style.display = 'block';
-                if (playersConnected === 2) {
-                    document.getElementById('car-2').style.display = 'block';
-                    setTimeout(startGame, 1000);
+            if (data.type === 'join-request') {
+                const count = state.players.filter(p => p.connected).length;
+                if(count < 2) {
+                    state.players[count].connected = true;
+                    document.getElementById(`car-${count+1}`).style.display = 'block';
+                    document.getElementById('lobby-status').innerText = `PŘIPOJENO (${count+1}/2)`;
+                    socket.emit('drive-data', { room: state.room, type: 'assign', idx: count });
+                    if(count === 1) setTimeout(launchGame, 1000);
                 }
             }
 
-            if (!gameActive) return;
-
-            // Handle incoming player data
-            const p = data.playerIndex === 0 ? p1Data : p2Data;
-            const carEl = document.getElementById(`car-${data.playerIndex + 1}`);
-
-            if (!p.alive) return;
-
-            if (data.angle !== undefined) {
-                p.angle = data.angle;
-                p.pos += (data.angle / 40) * p.speed;
-                if(p.pos < 5) p.pos = 5;
-                if(p.pos > 95) p.pos = 95;
-                carEl.style.left = p.pos + "%";
-                carEl.style.transform = `translateX(-50%) rotate(${p.angle / 5}deg)`;
+            if (data.idx !== undefined && state.active) {
+                const p = state.players[data.idx];
+                if (data.angle !== undefined) p.angle = data.angle;
+                if (data.pedal === 'gas') p.gas = data.active;
+                if (data.pedal === 'brake') p.brake = data.active;
             }
-
-            if (data.pedal === 'gas') p.speed = data.active ? 1.5 : 1;
-            if (data.pedal === 'brake') p.speed = data.active ? 0.4 : 1;
         });
 
-        function startGame() {
-            gameActive = true;
-            document.getElementById('wait-msg').style.display = 'none';
+        // --- GAME ENGINE ---
+        function launchGame() {
+            state.active = true;
             document.getElementById('game-screen').classList.add('animating');
-            startObstacleSpawning();
+            gameLoop();
+            spawner();
         }
 
-        function startObstacleSpawning() {
-            const spawnRate = 2000;
-            const interval = setInterval(() => {
-                if (!gameActive) {
-                    clearInterval(interval);
-                    return;
-                }
+        function gameLoop() {
+            if(!state.active) return;
+
+            // Global Speed
+            let targetSpeed = 8;
+            state.players.forEach(p => {
+                if(!p.alive) return;
+                if(p.gas) targetSpeed += 5;
+                if(p.brake) targetSpeed -= 4;
+                p.fuel -= 0.05; // Fuel consumption
+                if(p.fuel <= 0) p.alive = false;
+            });
+            state.speed = Math.max(3, targetSpeed);
+            document.documentElement.style.setProperty('--road-speed', (15 / state.speed) + 's');
+
+            // HUD
+            state.distance += state.speed / 20;
+            document.getElementById('dist-ui').innerText = Math.floor(state.distance) + " m";
+            document.getElementById('speed-ui').innerText = Math.floor(state.speed * 10) + " km/h";
+
+            // Update Players
+            state.players.forEach((p, i) => {
+                const car = document.getElementById(`car-${i+1}`);
+                if(!p.alive) { car.style.opacity = '0.2'; return; }
+
+                // Movement physics
+                p.pos += (p.angle / 50) * (state.speed / 10);
+                p.pos = Math.min(Math.max(p.pos, 5), 95);
                 
-                const obs = document.createElement('div');
-                obs.className = 'obstacle';
-                obs.style.left = (Math.random() * 80 + 10) + "%";
-                obs.style.top = "-50px";
-                document.getElementById('road-element').appendChild(obs);
+                car.style.left = p.pos + "%";
+                car.style.transform = `translateX(-50%) rotate(${p.angle / 6}deg)`;
+                document.getElementById(`fuel-${i+1}`).style.width = p.fuel + "%";
+            });
 
-                let pos = -50;
-                const moveObs = setInterval(() => {
-                    if (!gameActive) { clearInterval(moveObs); return; }
-                    
-                    pos += (6 * speedMultiplier);
-                    obs.style.top = pos + "px";
-                    
-                    // Collision detection for both players
-                    [p1Data, p2Data].forEach((p, idx) => {
-                        if (!p.alive) return;
-                        const carEl = document.getElementById(`car-${idx + 1}`);
-                        const carRect = carEl.getBoundingClientRect();
-                        const obsRect = obs.getBoundingClientRect();
+            checkCollisions();
+            requestAnimationFrame(gameLoop);
+        }
 
-                        if (pos > window.innerHeight - 200 && 
-                            Math.abs(carRect.left + 35 - (obsRect.left + 20)) < 40 &&
-                            Math.abs(carRect.top + 50 - (obsRect.top + 20)) < 50) {
-                            
+        function spawner() {
+            if(!state.active) return;
+
+            const type = Math.random() > 0.3 ? 'obstacle' : 'fuel';
+            const item = document.createElement('div');
+            item.className = 'item ' + type;
+            item.innerHTML = type === 'obstacle' ? '🚧' : '⛽';
+            item.style.left = (Math.random() * 70 + 15) + "%";
+            item.style.top = "-50px";
+            document.getElementById('game-road').appendChild(item);
+
+            let y = -50;
+            const moveInterval = setInterval(() => {
+                if(!state.active) { clearInterval(moveInterval); return; }
+                y += state.speed;
+                item.style.top = y + "px";
+
+                if(y > window.innerHeight) {
+                    clearInterval(moveInterval);
+                    item.remove();
+                }
+            }, 16);
+
+            setTimeout(spawner, 2000 / (state.distance / 500 + 1));
+        }
+
+        function checkCollisions() {
+            const items = document.querySelectorAll('.item');
+            state.players.forEach((p, i) => {
+                if(!p.alive) return;
+                const carRect = document.getElementById(`car-${i+1}`).getBoundingClientRect();
+
+                items.forEach(item => {
+                    const itemRect = item.getBoundingClientRect();
+                    if (Math.abs(carRect.left - itemRect.left) < 40 && Math.abs(carRect.top - itemRect.top) < 60) {
+                        if(item.classList.contains('obstacle')) {
                             p.alive = false;
-                            carEl.style.opacity = "0.2";
-                            checkGameOver();
+                            checkEnd();
+                        } else {
+                            p.fuel = Math.min(100, p.fuel + 30);
+                            item.remove();
                         }
-                    });
-
-                    if (pos > window.innerHeight) {
-                        clearInterval(moveObs);
-                        obs.remove();
                     }
-                }, 20);
-            }, spawnRate);
+                });
+            });
         }
 
-        function checkGameOver() {
-            if (!p1Data.alive && !p2Data.alive) {
-                endGame("REMIZA! OBA SE VYBOURALI.");
-            } else if (!p1Data.alive) {
-                endGame("HRÁČ 2 VYHRÁL!");
-            } else if (!p2Data.alive) {
-                endGame("HRÁČ 1 VYHRÁL!");
+        function checkEnd() {
+            const alive = state.players.filter(p => p.alive);
+            if(alive.length === 0 || (state.players[0].connected && state.players[1].connected && alive.length === 1)) {
+                state.active = false;
+                const overlay = document.getElementById('win-overlay');
+                overlay.style.display = 'flex';
+                document.getElementById('win-score').innerText = `Ujetá vzdálenost: ${Math.floor(state.distance)} m`;
+                
+                if(alive.length === 1) {
+                    const idx = state.players.indexOf(alive[0]);
+                    document.getElementById('win-msg').innerText = `HRÁČ ${idx+1} VYHRÁL!`;
+                    document.getElementById('win-msg').style.color = idx === 0 ? 'var(--p1-color)' : 'var(--p2-color)';
+                } else {
+                    document.getElementById('win-msg').innerText = "REMIZA!";
+                }
             }
-        }
-
-        function endGame(text) {
-            gameActive = false;
-            document.getElementById('winner-screen').style.display = 'flex';
-            document.getElementById('winner-text').innerText = text;
-            document.getElementById('game-screen').classList.remove('animating');
         }
     </script>
 </body>
