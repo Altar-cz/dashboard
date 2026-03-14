@@ -1,26 +1,36 @@
-    const express = require('express');
-    const http = require('http');
-    const { Server } = require('socket.io');
-    const path = require('path');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
 
-    const app = express();
-    const server = http.createServer(app);
-    const io = new Server(server, { cors: { origin: "*" } });
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { 
+    cors: { origin: "*" } 
+});
 
-    app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname)));
 
-    io.on('connection', (socket) => {
-        // Join a specific room based on the code
-        socket.on('join-room', (roomCode) => {
-            socket.join(roomCode);
-            console.log(`Zařízení ${socket.id} vstoupilo do místnosti: ${roomCode}`);
-        });
+const rooms = {};
 
-        // Forward steering data to the monitor in the same room
-        socket.on('drive-data', (data) => {
-            socket.to(data.room).emit('update-game', data);
-        });
+io.on('connection', (socket) => {
+    socket.on('join-room', (roomCode) => {
+        socket.join(roomCode);
+        if (!rooms[roomCode]) {
+            rooms[roomCode] = { players: [] };
+        }
+        console.log(`Zařízení ${socket.id} vstoupilo do místnosti: ${roomCode}`);
     });
 
-    const PORT = process.env.PORT || 3000;
-    server.listen(PORT, () => console.log('Hra běží na portu ' + PORT));
+    socket.on('drive-data', (data) => {
+        // Broadcast game data to all participants in the room
+        socket.to(data.room).emit('update-game', data);
+    });
+
+    socket.on('disconnect', () => {
+        // Cleanup could be handled here if needed
+    });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Ultimate Chill Drive běží na portu ${PORT}`));
