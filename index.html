@@ -2,63 +2,82 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Senzor & Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chill Drive</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; margin: 20px auto; }
-        button { background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        button:active { background: #0056b3; }
-        #value-display { font-size: 48px; font-weight: bold; color: #28a745; margin: 20px 0; }
-        .status { font-size: 12px; color: #666; }
+        body { margin: 0; font-family: sans-serif; overflow: hidden; background: #a8e6cf; }
+        #game-screen { display: none; width: 100vw; height: 100vh; position: relative; }
+        #car { width: 50px; height: 80px; background: #ff8b94; position: absolute; bottom: 50px; left: 50%; border-radius: 5px; transform-origin: center; transition: left 0.1s linear; }
+        #controller-screen { display: none; text-align: center; padding-top: 50px; }
+        .room-setup { text-align: center; margin-top: 100px; }
+        .wheel { width: 200px; height: 200px; border: 10px solid #333; border-radius: 50%; margin: 50px auto; transition: transform 0.1s; display: flex; align-items: center; justify-content: center; font-size: 40px; }
     </style>
 </head>
 <body>
 
-    <h1>📊 Moje IoT Aplikace</h1>
-    
-    <div class="card">
-        <h3>📱 Režim Senzor</h3>
-        <p>Kliknutím odešlete náhodná data do všech monitorů.</p>
-        <button onclick="odeslatData()">Odeslat hodnotu</button>
+    <div id="setup" class="room-setup">
+        <h1>🚗 Chill Drive</h1>
+        <button onclick="startAsMonitor()">SPUSTIT MONITOR (PC)</button>
+        <br><br>
+        <input type="text" id="roomInput" placeholder="Kód místnosti">
+        <button onclick="startAsController()">PŘIPOJIT MOBIL</button>
     </div>
 
-    <div class="card">
-        <h3>🖥️ Režim Monitor</h3>
-        <p>Poslední přijatá hodnota:</p>
-        <div id="value-display">--</div>
-        <p class="status" id="time-display">Čekám na data...</p>
+    <div id="game-screen">
+        <div id="car"></div>
+        <div style="position:absolute; top:20px; left:20px;">Kód místnosti: <b id="displayCode"></b></div>
+    </div>
+
+    <div id="controller-screen">
+        <h2>Držte telefon jako volant</h2>
+        <div id="wheel" class="wheel">🎡</div>
+        <p>Otáčejte telefonem doleva a doprava</p>
     </div>
 
     <script>
-        // Připojení k serveru (na Renderu nemusíme psát URL, najde si ji sám)
         const socket = io();
+        let currentRoom = "";
 
-        // 1. ODESÍLÁNÍ (pro mobil)
-        function odeslatData() {
-            const nahodneCislo = Math.floor(Math.random() * 100) + 1;
-            const cas = new Date().toLocaleTimeString();
-            
-            // Pošleme data na server
-            socket.emit('sensor-data', { 
-                value: nahodneCislo, 
-                time: cas 
-            });
-            
-            console.log("Data odeslána: " + nahodneCislo);
+        function startAsMonitor() {
+            currentRoom = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('displayCode').innerText = currentRoom;
+            socket.emit('join-room', currentRoom);
         }
 
-        // 2. PŘÍJEM (pro PC/Dashboard)
-        socket.on('update-dashboard', (data) => {
-            document.getElementById('value-display').innerText = data.value;
-            document.getElementById('time-display').innerText = "Aktualizováno v: " + data.time;
+        function startAsController() {
+            currentRoom = document.getElementById('roomInput').value.toUpperCase();
+            if(!currentRoom) return alert("Zadej kód!");
             
-            // Malý vizuální efekt při změně
-            document.getElementById('value-display').style.color = '#007bff';
-            setTimeout(() => {
-                document.getElementById('value-display').style.color = '#28a745';
-            }, 300);
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('controller-screen').style.display = 'block';
+            socket.emit('join-room', currentRoom);
+
+            // Aktivace gyroskopu
+            window.addEventListener('deviceorientation', (event) => {
+                let steering = event.gamma; // Náklon do stran (-90 až 90)
+                document.getElementById('wheel').style.transform = `rotate(${steering}deg)`;
+                socket.emit('drive-data', { room: currentRoom, angle: steering });
+            });
+        }
+
+        // Logika pohybu auta na monitoru
+        const car = document.getElementById('car');
+        let carPos = 50; 
+
+        socket.on('update-game', (data) => {
+            if (data.angle !== undefined) {
+                // Převod úhlu na pohyb (citlivost)
+                carPos += (data.angle * 0.5);
+                // Omezení, aby auto nevyjelo z obrazovky
+                if(carPos < 5) carPos = 5;
+                if(carPos > 95) carPos = 95;
+                
+                car.style.left = carPos + "%";
+                car.style.transform = `translateX(-50%) rotate(${data.angle/2}deg)`;
+            }
         });
     </script>
 </body>
